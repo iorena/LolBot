@@ -9,42 +9,68 @@ class Loader():
         data = []
         self.nicks = list(dict.fromkeys(nicks))
 
-        with open("../data/2012-12-13_to_2014-02-01") as infile:
+        with open("../data/logs1.txt") as infile:
             data += infile.readlines()
-        with open("../data/2014-04-10_to_2016-06-15") as infile:
+        with open("../data/logs2.txt") as infile:
             data += infile.readlines()
-        with open("../data/2016-08-17_to_2018-02-12") as infile:
+        with open("../data/logs3.txt") as infile:
             data += infile.readlines()
 
         print("Loaded", len(data), "rows of data")
 
-        self.data = list(map(lambda x: x.split(" "), data))
+        self.data = list(map(lambda x: self.split_line(x), data))
 
-        # print(self.data[5])
-        # print("".join(self.data[5][3:5]))
-
+        # collect topic changes
         topics = list(filter(lambda x: len(x) > 6 and " ".join(x[3:6]) == "changed the topic", self.data))
         self.topics = list(map(lambda x: " ".join(x[9:]), topics))
         # print(self.topics)
 
+        self.lines = list(map(lambda x: self.format_nicks(x), self.data))
+
+        print(self.lines[456], self.lines[1006345], self.lines[2000000])
+
         # keep only lines by users (no join messages, etc.)
-        self.lines = list(filter(lambda x: len(x[0]) == 5 and self.is_nick(x[1]), self.data))
-        # filter out \n
-        self.lines = list(map(lambda x: " ".join(x).replace("\n", "").split(" "), self.lines))
+        self.lines = list(filter(lambda x: len(x[0]) in [9, 10] and self.is_nick(x[2]), self.lines))
 
         # standardize nicknames
-        self.lines = list(map(lambda x: [x[0], self.find_nick(x[1])] + x[2:], self.lines))
+        self.lines = list(map(lambda x: self.standardize_nicks(x), self.lines))
 
         print("Filtered, left with", len(self.lines), "rows of text")
+        print(self.lines[456], self.lines[1006345], self.lines[2000000])
 
+    def split_line(self, line):
+        words = []
+        for space_split in line.split(" "):
+            for tab_split in space_split.split("\t"):
+                if len(tab_split) > 0:
+                    words.append(tab_split.replace("\n", ""))
+        return words
+
+    def format_nicks(self, line):
+        if len(line) < 3:
+            return line
+        new_line = [line[0], line[1]]
+        if line[2] == "<":
+            nick = re.sub(r"[<>@+]", "", line[3])
+            new_line.append(nick)
+            new_line += line[4:]
+        else:
+            nick = re.sub(r"[<>@+]", "", line[2])
+            new_line.append(nick)
+            new_line += line[3:]
+        return new_line
+
+    def standardize_nicks(self, line):
+        if len(line) < 5:
+            return line
+        return [line[0], line[1], self.find_nick(line[2])] + line[3:]
 
     def is_nick(self, string):
-        if len(string) > 3 and string[0] == "<" and string[len(string) - 1] == ">":
+        if len(string) > 1:
             return True
         return False
 
     def find_nick(self, nick):
-        nick = re.sub(r"[<> @+]", "", nick)
         for nickname in nicks:
             if nick in nicks[nickname]:
                 return nickname
